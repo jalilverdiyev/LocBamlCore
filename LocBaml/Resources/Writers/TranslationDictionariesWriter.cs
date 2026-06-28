@@ -12,6 +12,7 @@ using System.Collections;
 using System.Reflection;
 using System.IO;
 using System;
+using System.Linq;
 
 namespace BamlLocalization.Resources
 {
@@ -20,12 +21,15 @@ namespace BamlLocalization.Resources
     /// </summary>
     internal static class TranslationDictionariesWriter
     {
+        private static ParseOptions? _options;
+
         /// <summary>
         /// Write the localizable key-value pairs
         /// </summary>
         /// <param name="options"></param>
         internal static void Write(ParseOptions options)
         {
+            _options = options;;
             options.WriteLine(StringTable.Get("CreateTranslationsFile", options.Output));
             Stream output = new FileStream(options.Output, FileMode.Create);
 
@@ -106,7 +110,35 @@ namespace BamlLocalization.Resources
 
         private static Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
         {
-            // TODO: We might wanna give the users an ability to provide a custom assembly in case they've forgotten
+            var assemblyName = new AssemblyName(args.Name);
+            var nameStr = assemblyName.Name;
+
+            if (string.IsNullOrEmpty(nameStr))
+                return null;
+
+            var loadedAssembly = AppDomain.CurrentDomain
+                    .GetAssemblies()
+                    .FirstOrDefault(a => a.GetName().Name == nameStr);
+
+            if(loadedAssembly != null)
+                return loadedAssembly;
+
+            var localPath = Path.Combine(AppContext.BaseDirectory, $"{nameStr}.dll");
+
+            if(File.Exists(localPath))
+                return Assembly.LoadFrom(localPath);
+
+            if (_options?.SearchPaths is not { Count: > 0 })
+                return null;
+
+            foreach (var path in _options.SearchPaths)
+            {
+                var targetDll = Path.Combine(path, $"{nameStr}.dll");
+
+                if (File.Exists(targetDll))
+                    return Assembly.LoadFrom(targetDll);
+            }
+
             return null;
         }
     }
