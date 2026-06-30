@@ -12,12 +12,14 @@ using System.Collections;
 using System.Reflection;
 using System.IO;
 using System;
+using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Metadata;
 
 namespace BamlLocalization.Resources
 {
     /// <summary>
-    /// Writer to write out localizable values into CSV or tab-separated txt files.     
+    /// Writer to write out localizable values into CSV or tab-separated txt files.
     /// </summary>
     internal static class TranslationDictionariesWriter
     {
@@ -29,7 +31,7 @@ namespace BamlLocalization.Resources
         /// <param name="options"></param>
         internal static void Write(ParseOptions options)
         {
-            _options = options;;
+            _options = options;
             options.WriteLine(StringTable.Get("CreateTranslationsFile", options.Output));
             Stream output = new FileStream(options.Output, FileMode.Create);
 
@@ -110,36 +112,39 @@ namespace BamlLocalization.Resources
 
         private static Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
         {
-            var assemblyName = new AssemblyName(args.Name);
-            var nameStr = assemblyName.Name;
+#if NET9_0_OR_GREATER
+            AssemblyName assemblyName = AssemblyNameInfo.Parse(args.Name).ToAssemblyName();
+#else
+            AssemblyName assemblyName = new AssemblyName(args.Name);
+#endif
+            string? nameStr = assemblyName.Name;
+            Debug.Assert(assemblyName.Name is not null);
 
-            if (string.IsNullOrEmpty(nameStr))
-                return null;
-
-            var loadedAssembly = AppDomain.CurrentDomain
-                    .GetAssemblies()
-                    .FirstOrDefault(a => a.GetName().Name == nameStr);
-
-            if(loadedAssembly != null)
-                return loadedAssembly;
-
-            var localPath = Path.Combine(AppContext.BaseDirectory, $"{nameStr}.dll");
-
-            if(File.Exists(localPath))
-                return Assembly.LoadFrom(localPath);
-
-            if (_options?.SearchPaths is not { Count: > 0 })
-                return null;
-
-            foreach (var path in _options.SearchPaths)
+            try
             {
-                var targetDll = Path.Combine(path, $"{nameStr}.dll");
-
-                if (File.Exists(targetDll))
-                    return Assembly.LoadFrom(targetDll);
+                string localPath = Path.Combine(AppContext.BaseDirectory, $"{nameStr}.dll");
+                return Assembly.LoadFrom(localPath);
             }
+            catch (FileNotFoundException)
+            {
+                if (_options?.SearchPaths is not { Count: > 0 })
+                    return null;
 
-            return null;
+                foreach (var path in _options.SearchPaths)
+                {
+                    try
+                    {
+                        var targetDll = Path.Combine(path, $"{nameStr}.dll");
+                        return Assembly.LoadFrom(targetDll);
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                }
+
+                return null;
+            }
         }
     }
 }

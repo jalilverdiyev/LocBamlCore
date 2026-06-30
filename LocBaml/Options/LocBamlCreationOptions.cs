@@ -165,8 +165,8 @@ namespace BamlLocalization.Options
                 {
                     try
                     {
-                        var path = AssemblyPaths[i];
-                        var attributes = File.GetAttributes(path);
+                        string path = AssemblyPaths[i];
+                        FileAttributes attributes = File.GetAttributes(path);
 
                         if (attributes.HasFlag(FileAttributes.Directory))
                         {
