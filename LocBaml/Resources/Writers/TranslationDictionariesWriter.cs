@@ -113,7 +113,7 @@ namespace BamlLocalization.Resources
         private static Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
         {
 #if NET9_0_OR_GREATER
-            AssemblyName assemblyName = AssemblyNameInfo.Parse(args.Name).ToAssemblyName();
+            AssemblyNameInfo assemblyName = AssemblyNameInfo.Parse(args.Name);
 #else
             AssemblyName assemblyName = new AssemblyName(args.Name);
 #endif
@@ -130,11 +130,11 @@ namespace BamlLocalization.Resources
                 if (_options?.SearchPaths is not { Count: > 0 })
                     return null;
 
-                foreach (var path in _options.SearchPaths)
+                foreach (string path in _options.SearchPaths)
                 {
                     try
                     {
-                        var targetDll = Path.Combine(path, $"{nameStr}.dll");
+                        string targetDll = Path.Combine(path, $"{nameStr}.dll");
                         return Assembly.LoadFrom(targetDll);
                     }
                     catch
